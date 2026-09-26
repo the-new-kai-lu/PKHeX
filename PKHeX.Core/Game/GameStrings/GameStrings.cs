@@ -99,7 +99,7 @@ public sealed class GameStrings : IBasicStrings
 
         itemlist = Get("items");
         characteristics = Get("character");
-        specieslist = Get("species");
+        specieslist = HGEngineSpecies.ExtendNames(Get("species"));
         wallpapernames = Get("wallpaper");
         groundtiletypes = Get("groundtile");
         gamelist = Get("games");

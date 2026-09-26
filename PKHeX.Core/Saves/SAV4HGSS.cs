@@ -9,6 +9,14 @@ namespace PKHeX.Core;
 /// </summary>
 public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
 {
+    private readonly HGEngineSave? engine;
+    public bool IsHGEngine => engine is not null;
+    internal void CopyHGEngineFrom(SAV4HGSS other)
+    {
+        if (engine is not null && other.engine is not null) engine.CopyFrom(other.engine);
+    }
+    internal Memory<byte> HGEngineDex => engine?.Dex ?? Memory<byte>.Empty;
+
     public SAV4HGSS() : base(GeneralSize, StorageSize)
     {
         Initialize();
@@ -16,18 +24,22 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
         Dex = new Zukan4(this, GeneralBuffer[PokeDex..]);
     }
 
-    public SAV4HGSS(Memory<byte> data) : base(data, GeneralSize, StorageSize, GeneralSize + GeneralGap)
+    public SAV4HGSS(Memory<byte> data) : this(data, HGEngineSave.IsRecognized(data.Span) ? new HGEngineSave(data.Span) : null) { }
+
+    private SAV4HGSS(Memory<byte> data, HGEngineSave? adapter) : base(adapter is null ? data : adapter.Normalize(), GeneralSize, StorageSize, GeneralSize + GeneralGap)
     {
+        engine = adapter;
         Initialize();
         Mystery = new MysteryBlock4HGSS(this, GeneralBuffer.Slice(OffsetMystery, MysteryBlock4HGSS.Size));
         Dex = new Zukan4(this, GeneralBuffer[PokeDex..]);
     }
 
     public override Zukan4 Dex { get; }
-    protected override SAV4 CloneInternal4() => State.Exportable ? new SAV4HGSS(Data.ToArray()) : new SAV4HGSS();
+    protected override SAV4 CloneInternal4() => State.Exportable ? new SAV4HGSS(engine is null ? Data.ToArray() : engine.Export(Data)) : new SAV4HGSS();
 
     public override GameVersion Version { get => (GameVersion)ROMCode; set => ROMCode = (byte)value; }
-    public override PersonalTable4 Personal => PersonalTable.HGSS;
+    public override PersonalTable4 Personal => IsHGEngine ? HGEngineSpecies.Personal : PersonalTable.HGSS;
+    public override ushort MaxSpeciesID => IsHGEngine ? HGEngineSpecies.Last : (ushort)Legal.MaxSpeciesID_4;
     public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_HGSS;
     public override int MaxItemID => Legal.MaxItemID_4_HGSS;
     public const int GeneralSize = 0xF628;
@@ -57,7 +69,8 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
         // Make sure all boxes are copied when saved only once in-game.
         // This results in the game "saving a lot of data", but ensures the boxdata struct does not corrupt in-game on single save.
         FlagsBoxContentChanged = FlagsBoxContentChangedAll;
-        return base.GetFinalData();
+        var result = base.GetFinalData();
+        return engine is null ? result : engine.Export(result.Span);
     }
 
     private const int OffsetMystery = 0x9D3C; // Flags and Gifts

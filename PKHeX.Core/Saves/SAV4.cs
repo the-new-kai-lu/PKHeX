@@ -81,13 +81,14 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
     {
         SetData(sav.Data, 0);
         var s4 = (SAV4)sav;
+        if (this is SAV4HGSS hg && sav is SAV4HGSS source) hg.CopyHGEngineFrom(source);
         SetData(General, s4.General);
         SetData(Storage, s4.Storage);
     }
 
     public sealed override int SIZE_STORED => PokeCrypto.SIZE_4STORED;
     public sealed override int SIZE_PARTY => PokeCrypto.SIZE_4PARTY;
-    public sealed override PK4 BlankPKM => new();
+    public sealed override PK4 BlankPKM => new() { IsHGEngine = this is SAV4HGSS { IsHGEngine: true } };
     public sealed override Type PKMType => typeof(PK4);
 
     public sealed override int BoxCount => 18;
@@ -102,7 +103,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
     public sealed override int MaxCoins => 50_000;
 
     public sealed override ushort MaxMoveID => Legal.MaxMoveID_4;
-    public sealed override ushort MaxSpeciesID => Legal.MaxSpeciesID_4;
+    public override ushort MaxSpeciesID => Legal.MaxSpeciesID_4;
     // MaxItemID
     public sealed override int MaxAbilityID => Legal.MaxAbilityID_4;
     public sealed override int MaxBallID => Legal.MaxBallID_4;
@@ -177,7 +178,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
         }
     }
 
-    private static int GetActiveBlock(ReadOnlySpan<byte> data, [ConstantExpected] int begin, [ConstantExpected] int length)
+    internal static int GetActiveBlock(ReadOnlySpan<byte> data, [ConstantExpected] int begin, [ConstantExpected] int length)
     {
         int offset = begin + length - 0x14;
         return SAV4BlockDetection.CompareFooters(data, offset, offset + PartitionSize);
@@ -398,7 +399,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
     }
     #endregion
 
-    protected sealed override PK4 GetPKM(Memory<byte> data) => new(data);
+    protected sealed override PK4 GetPKM(Memory<byte> data) => new(data) { IsHGEngine = this is SAV4HGSS { IsHGEngine: true } };
     protected sealed override void DecryptPKM(Span<byte> data) => PokeCrypto.Decrypt45(data);
 
     protected override void SetPKM(PKM pk, bool isParty = false)

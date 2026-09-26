@@ -21,7 +21,7 @@ public class DataUtilTests
     [Theory]
     [MemberData(nameof(AllLanguages))]
     public void GetsCorrectNumberOfSpeciesNames(string language)
-        => VerifyArrayLength(language, static s => s.specieslist, (int)Species.MAX_COUNT);
+        => VerifyArrayLength(language, static s => s.specieslist, HGEngineSpecies.Last + 1);
 
     [Theory]
     [MemberData(nameof(AllLanguages))]

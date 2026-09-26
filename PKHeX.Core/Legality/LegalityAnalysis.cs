@@ -114,6 +114,14 @@ public sealed class LegalityAnalysis
         SlotOrigin = source;
 
         Info = new LegalInfo(pk, Parse);
+        if (pk is PK4 && HGEngineSpecies.IsCustom(pk.Species))
+        {
+            // ROM-hack species have no retail encounter legality. Do not send their
+            // IDs through retail encounter/evolution tables or claim legality.
+            EnsureMovesPopulated();
+            AddLine(Severity.Invalid, EncConditionBadSpecies, CheckIdentifier.GameOrigin);
+            return;
+        }
 #if SUPPRESS
         try
 #endif

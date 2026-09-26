@@ -32,7 +32,7 @@ public static class SpeciesName
     /// </summary>
     /// <param name="language">Language of the Pokémon species names to select (e.g. "en", "fr", "jp", etc.)</param>
     /// <returns>An array of strings whose indexes correspond to the IDs of each Pokémon species name.</returns>
-    private static string[] GetSpeciesList(string language) => Util.GetStringList("species", language);
+    private static string[] GetSpeciesList(string language) => HGEngineSpecies.ExtendNames(Util.GetStringList("species", language));
 
     /// <summary>
     /// Egg name list indexed by the <see cref="LanguageID"/> value.

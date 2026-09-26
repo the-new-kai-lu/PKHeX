@@ -46,6 +46,11 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
 
     private bool GetRegionFlag(int region, int index)
     {
+        if (index >= 493 && SAV is SAV4HGSS { IsHGEngine: true } hg)
+        {
+            ReadOnlySpan<int> offsets = [4, 0x400, 0x500, 0x600];
+            return FlagUtil.GetFlag(hg.HGEngineDex.Span, offsets[region] + (index >> 3), index);
+        }
         var ofs = 4 + (region * SIZE_REGION) + (index >> 3);
         return FlagUtil.GetFlag(Data, ofs, index);
     }
@@ -57,6 +62,12 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
 
     private void SetRegionFlag(int region, int index, bool value)
     {
+        if (index >= 493 && SAV is SAV4HGSS { IsHGEngine: true } hg)
+        {
+            ReadOnlySpan<int> offsets = [4, 0x400, 0x500, 0x600];
+            FlagUtil.SetFlag(hg.HGEngineDex.Span, offsets[region] + (index >> 3), index, value);
+            return;
+        }
         var ofs = 4 + (region * SIZE_REGION) + (index >> 3);
         FlagUtil.SetFlag(Data, ofs, index, value);
     }
@@ -275,6 +286,14 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
     public override void SetDex(PKM pk)
     {
         var species = pk.Species;
+        if (HGEngineSpecies.IsCustom(species) && SAV is SAV4HGSS { IsHGEngine: true })
+        {
+            if (pk.IsEgg) return;
+            SetCaught(species);
+            SetSeenGender(species, pk.Gender);
+            SetSeen(species);
+            return; // Custom species have no retail form/language record slots.
+        }
         if (species is 0 or > Legal.MaxSpeciesID_4)
             return;
         if (pk.IsEgg) // do not add
