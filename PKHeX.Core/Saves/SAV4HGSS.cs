@@ -22,6 +22,7 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
     public SAV4HGSS() : base(GeneralSize, StorageSize)
     {
         Initialize();
+        Version = GameVersion.HGSS;
         Mystery = new MysteryBlock4HGSS(this, GeneralBuffer.Slice(OffsetMystery, MysteryBlock4HGSS.Size));
         Dex = new Zukan4(this, GeneralBuffer[PokeDex..]);
     }
@@ -62,7 +63,8 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
 
     private void Initialize()
     {
-        Version = GameVersion.HGSS;
+        // Loading a save must not modify its bytes. In particular, ROMCode uses
+        // Trainer1 and must not be assigned before these offsets are initialized.
         GetSAVOffsets();
     }
 

@@ -12,8 +12,11 @@ public class FakemonStockTests
         var data = new byte[0x80000];
         for (int slot = 0; slot < 2; slot++)
         {
-            var part = data.AsSpan(slot * 0x40000);
+            var part = data.AsSpan(slot * 0x40000, 0x40000);
+            part[0x23000..].Fill(0xFF); // Uninitialized optional extra blocks.
             WriteUInt32LittleEndian(part[FakemonStockProfile.DexOffset..], 0xBEEFCAFE);
+            part[0x1C] = 0x1A; // Adventure data, not ROMCode.
+            part[0x80] = (byte)GameVersion.HG;
             if (marked)
             {
                 part[FakemonStockProfile.MarkerOffset] = 0x46;
@@ -37,6 +40,20 @@ public class FakemonStockTests
     }
 
     private static SAV4HGSS Load(Memory<byte> data) => Assert.IsType<SAV4HGSS>(SaveUtil.GetSaveFile(data));
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void LoadingDoesNotMutateSaveBytesOrInvalidateChecksums(bool marked)
+    {
+        var data = Fixture(marked);
+        var original = (byte[])data.Clone();
+        var sav = Load(data);
+        Assert.Equal(original, data);
+        Assert.True(sav.ChecksumsValid);
+        Assert.Equal(GameVersion.HG, sav.Version);
+        Assert.Equal(0x1A, sav.General[0x1C]);
+    }
 
     [Fact]
     public void MarkerAndVersionSelectOnlyTheStockProfile()

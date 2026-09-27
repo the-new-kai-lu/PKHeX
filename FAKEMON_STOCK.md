@@ -24,7 +24,7 @@ The save profile supplies move names, type icons, PP and PP Ups behavior without
 
 ## Verification
 
-`FakemonStockTests` cover marker/version isolation, all eleven species in encrypted party/box save round trips, their levels and checksums, custom Dex flags without overwriting Deoxys history, canonical personal data preservation, normalized types, compact move IDs, names, PP, cloning and retail selector isolation. Existing `HGEngineTests` remain applicable to the separate expanded profile. All ten focused stock/hg-engine tests passed; the full suite finished with 606 passed, 1 skipped and the one previously reproduced upstream failure noted below. The Windows UI cross-build passed with no warnings or errors.
+`FakemonStockTests` cover marker/version isolation, all eleven species in encrypted party/box save round trips, their levels and checksums, custom Dex flags without overwriting Deoxys history, canonical personal data preservation, normalized types, compact move IDs, names, PP, cloning and retail selector isolation. Existing `HGEngineTests` remain applicable to the separate expanded profile. All twelve focused stock/hg-engine tests passed; the full suite finished with 608 passed, 1 skipped and the one previously reproduced upstream failure noted below. The Windows UI cross-build passed with no warnings or errors.
 
 Commands (Linux/WSL):
 
@@ -34,6 +34,12 @@ dotnet build PKHeX.WinForms/PKHeX.WinForms.csproj -c Debug -p:EnableWindowsTarge
 ```
 
 The Windows UI build is a compilation check; it does not establish Windows UI or emulator end-to-end behavior. The existing full test suite has a known upstream failure in `EffortExpLegalityTests.ZeroEVs_ReturnsZero`, reproduced previously on untouched upstream.
+
+## Emulator save round trip
+
+A headless DeSmuME run loaded the editor-created Voltuff fixture in the modified HeartGold ROM (SHA-256 `bbbc8b8ab9062fc5f1374a7522e76ddd56a87308457ae45b55b5f245bf00b9c7`) and saved in-game. Both general and storage counters advanced from 2847 to 2848, selecting the alternate save partition; 1,791 bytes changed. Independent CRC checks passed for both copies of both blocks. PKHeX reopened the actual game output with a valid stock profile and valid checksums, retaining Voltuff at level 10 and all eleven custom boxed species at level 50 with compact moves 468/470/472/474 and correct PP.
+
+This exposed and fixed an inherited HGSS loader bug: assigning the version before initializing offsets overwrote adventure-data byte 0x1C and made valid game saves appear to have an invalid checksum. Loading now preserves every source byte; new marked and retail regression cases cover it. This save round trip does not establish every battle, evolution, animation or interactive editor behavior below.
 
 ## Manual end-to-end acceptance
 
