@@ -8,6 +8,7 @@ namespace PKHeX.Core;
 public sealed class PK4 : G4PKM
 {
     internal bool IsHGEngine { get; set; }
+    public bool IsFakemonStock { get; internal set; }
     public override ReadOnlySpan<ushort> ExtraBytes =>
     [
         0x42, 0x43, // Unused
@@ -18,7 +19,7 @@ public sealed class PK4 : G4PKM
     public override int SIZE_PARTY => PokeCrypto.SIZE_4PARTY;
     public override int SIZE_STORED => PokeCrypto.SIZE_4STORED;
     public override EntityContext Context => EntityContext.Gen4;
-    public override PersonalInfo4 PersonalInfo => (IsHGEngine || HGEngineSpecies.IsCustom(Species) ? HGEngineSpecies.Personal : PersonalTable.HGSS).GetFormEntry(Species, Form);
+    public override PersonalInfo4 PersonalInfo => (IsFakemonStock ? FakemonStockProfile.Personal : IsHGEngine || HGEngineSpecies.IsCustom(Species) ? HGEngineSpecies.Personal : PersonalTable.HGSS).GetFormEntry(Species, Form);
 
     public PK4() : base(PokeCrypto.SIZE_4PARTY) { }
     public PK4(Memory<byte> data) : base(DecryptParty(data)) { }
@@ -34,7 +35,7 @@ public sealed class PK4 : G4PKM
         return result;
     }
 
-    public override PK4 Clone() => new(Data.ToArray()) { IsHGEngine = IsHGEngine };
+    public override PK4 Clone() => new(Data.ToArray()) { IsHGEngine = IsHGEngine, IsFakemonStock = IsFakemonStock };
 
     // Structure
     public override uint PID { get => ReadUInt32LittleEndian(Data); set => WriteUInt32LittleEndian(Data, value); }

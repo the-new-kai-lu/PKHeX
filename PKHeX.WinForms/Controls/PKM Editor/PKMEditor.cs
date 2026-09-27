@@ -272,7 +272,7 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
         SetPKMFormatExtraBytes(pk);
         (GetFieldsfromPKM, GetPKMfromFields) = GetLoadSet(pk);
         foreach (var move in Moves)
-            move.SetContext(pk.Context);
+            move.SetContext(pk);
         TB_Nickname.DisplayContext = TB_OT.DisplayContext = TB_HT.DisplayContext = pk.Context;
     }
 
@@ -789,6 +789,8 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
 
     private bool SetSuggestedMoves(bool random = false, bool silent = false)
     {
+        if (Entity is PK4 { IsFakemonStock: true } || HGEngineSpecies.IsCustom(Entity.Species))
+            return false;
         Span<ushort> moves = stackalloc ushort[4];
         Entity.GetMoveSet(moves, random);
         if (moves[0] == 0)
@@ -1851,7 +1853,7 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
         var brush = highlight ? SystemBrushes.MenuHighlight : (valid ? BrushLegal : SystemBrushes.ControlLightLight);
         var textColor = highlight && !Application.IsDarkModeEnabled ? SystemColors.HighlightText : SystemColors.ControlText;
 
-        var type = MoveInfo.GetType((ushort)value, Entity.Context);
+        var type = MoveInfo.GetType((ushort)value, Entity);
         var moveTypeIcon = TypeSpriteUtil.GetTypeSpriteIconSmall(type);
         DrawMoveRectangle(e, brush, text, textColor, moveTypeIcon);
     }

@@ -51,6 +51,12 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
             ReadOnlySpan<int> offsets = [4, 0x400, 0x500, 0x600];
             return FlagUtil.GetFlag(hg.HGEngineDex.Span, offsets[region] + (index >> 3), index);
         }
+        if (SAV is SAV4HGSS { IsFakemonStock: true })
+        {
+            if (index >= 493 && !HGEngineSpecies.IsCustom((ushort)(index + 1))) return false;
+            index = FakemonStockProfile.GetDexIndex((ushort)(index + 1));
+        }
+        if ((uint)index >= 504) return false;
         var ofs = 4 + (region * SIZE_REGION) + (index >> 3);
         return FlagUtil.GetFlag(Data, ofs, index);
     }
@@ -68,6 +74,12 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
             FlagUtil.SetFlag(hg.HGEngineDex.Span, offsets[region] + (index >> 3), index, value);
             return;
         }
+        if (SAV is SAV4HGSS { IsFakemonStock: true })
+        {
+            if (index >= 493 && !HGEngineSpecies.IsCustom((ushort)(index + 1))) return;
+            index = FakemonStockProfile.GetDexIndex((ushort)(index + 1));
+        }
+        if ((uint)index >= 504) return;
         var ofs = 4 + (region * SIZE_REGION) + (index >> 3);
         FlagUtil.SetFlag(Data, ofs, index, value);
     }
@@ -286,7 +298,7 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
     public override void SetDex(PKM pk)
     {
         var species = pk.Species;
-        if (HGEngineSpecies.IsCustom(species) && SAV is SAV4HGSS { IsHGEngine: true })
+        if (HGEngineSpecies.IsCustom(species) && SAV is SAV4HGSS { HasCustomSpecies: true })
         {
             if (pk.IsEgg) return;
             SetCaught(species);
@@ -367,6 +379,7 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
 
     public bool GetLanguageBitIndex(ushort species, int lang)
     {
+        if (species is 0 or > Legal.MaxSpeciesID_4) return false;
         int dpl = 1 + DPLangSpecies.IndexOf(species);
         if (DP && dpl <= 0)
             return false;
@@ -378,6 +391,7 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
 
     public void SetLanguageBitIndex(ushort species, int lang, bool value)
     {
+        if (species is 0 or > Legal.MaxSpeciesID_4) return;
         int dpl = 1 + DPLangSpecies.IndexOf(species);
         if (DP && dpl <= 0)
             return;
@@ -391,6 +405,7 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
 
     private int GetSpeciesLanguageByteIndex(ushort species)
     {
+        if (species is 0 or > Legal.MaxSpeciesID_4) return -1;
         if (DP)
             return DPLangSpecies.IndexOf(species);
         return species;
@@ -479,7 +494,7 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
     private void CompleteSeen(ushort species)
     {
         SetSeen(species);
-        var pi = PersonalTable.HGSS[species];
+        var pi = SAV.Personal[species];
         if (pi.IsDualGender)
         {
             SetSeenGenderFirst(species, 0);
@@ -523,10 +538,13 @@ public sealed class Zukan4(SAV4 sav, Memory<byte> raw) : ZukanBase<SAV4>(sav, ra
     public override void SetDexEntryAll(ushort species, bool shinyToo = false) => ModifyAll(species, SetDexArgs.Complete);
     public override void ClearDexEntryAll(ushort species) => ModifyAll(species, SetDexArgs.None);
 
-    private static void IterateAll(Action<ushort> a)
+    private void IterateAll(Action<ushort> a)
     {
         for (ushort i = 1; i <= Legal.MaxSpeciesID_4; i++)
             a(i);
+        if (SAV is SAV4HGSS { HasCustomSpecies: true })
+            for (ushort i = HGEngineSpecies.First; i <= HGEngineSpecies.Last; i++)
+                a(i);
     }
 
     public override void SetAllSeen(bool value = true, bool shinyToo = false)

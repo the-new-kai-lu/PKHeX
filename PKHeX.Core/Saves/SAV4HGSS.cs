@@ -11,6 +11,8 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
 {
     private readonly HGEngineSave? engine;
     public bool IsHGEngine => engine is not null;
+    public bool IsFakemonStock => !IsHGEngine && FakemonStockProfile.IsRecognized(General);
+    public bool HasCustomSpecies => IsHGEngine || IsFakemonStock;
     internal void CopyHGEngineFrom(SAV4HGSS other)
     {
         if (engine is not null && other.engine is not null) engine.CopyFrom(other.engine);
@@ -38,8 +40,8 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
     protected override SAV4 CloneInternal4() => State.Exportable ? new SAV4HGSS(engine is null ? Data.ToArray() : engine.Export(Data)) : new SAV4HGSS();
 
     public override GameVersion Version { get => (GameVersion)ROMCode; set => ROMCode = (byte)value; }
-    public override PersonalTable4 Personal => IsHGEngine ? HGEngineSpecies.Personal : PersonalTable.HGSS;
-    public override ushort MaxSpeciesID => IsHGEngine ? HGEngineSpecies.Last : (ushort)Legal.MaxSpeciesID_4;
+    public override PersonalTable4 Personal => IsHGEngine ? HGEngineSpecies.Personal : IsFakemonStock ? FakemonStockProfile.Personal : PersonalTable.HGSS;
+    public override ushort MaxSpeciesID => HasCustomSpecies ? HGEngineSpecies.Last : (ushort)Legal.MaxSpeciesID_4;
     public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_HGSS;
     public override int MaxItemID => Legal.MaxItemID_4_HGSS;
     public const int GeneralSize = 0xF628;
@@ -192,6 +194,11 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
 
     protected override void SetPKM(PKM pk, bool isParty = false)
     {
+        if (pk is PK4 pk4)
+        {
+            pk4.IsHGEngine = IsHGEngine;
+            pk4.IsFakemonStock = IsFakemonStock;
+        }
         base.SetPKM(pk, isParty);
         if (!isParty)
             ((PK4)pk).WalkingMood = 0;

@@ -24,13 +24,13 @@ public static class HGEngineSpecies
         [100, 120, 75, 115, 115, 75, 4, 2, 45, 0, 68, 1, 0, 0, 0, 0, 127, 20, 70, 5, 2, 4, 11, 11, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], // Ragnaroc
     ];
     public static readonly PersonalTable4 Personal = CreateTable();
-    private static PersonalTable4 CreateTable()
+    internal static PersonalTable4 CreateTable(bool engine = true)
     {
         var data = new byte[(Last + 1) * PersonalInfo4.SIZE];
         for (int i = 0; i < PersonalTable.HGSS.Count; i++)
             PersonalTable.HGSS[i].Write().CopyTo(data, i * PersonalInfo4.SIZE);
         var canonical = Util.GetBinaryResource("personal_hg_engine");
-        for (int i = 0; i <= 493; i++)
+        for (int i = 0; engine && i <= 493; i++)
         {
             // Retain PKHeX's form-index metadata in the last three bytes.
             canonical.AsSpan(i * PersonalInfo4.SIZE, 41).CopyTo(data.AsSpan(i * PersonalInfo4.SIZE));
@@ -38,7 +38,16 @@ public static class HGEngineSpecies
                 data[i * PersonalInfo4.SIZE + 23] = data[i * PersonalInfo4.SIZE + 22];
         }
         for (int i = 0; i < Entries.Length; i++)
-            Entries[i].CopyTo(data, (First + i) * PersonalInfo4.SIZE);
+        {
+            int offset = (First + i) * PersonalInfo4.SIZE;
+            Entries[i].CopyTo(data, offset);
+            if (!engine)
+            {
+                // ROM type 9 is the unused Mystery type; PKHeX omits it.
+                if (data[offset + 6] > 9) data[offset + 6]--;
+                if (data[offset + 7] > 9) data[offset + 7]--;
+            }
+        }
         return new PersonalTable4(data, Last);
     }
     public static string[] ExtendNames(string[] original)

@@ -15,7 +15,7 @@ public abstract class G4PKM : PKM, IHandlerUpdate,
     protected override void EncryptParty(Span<byte> party) => PokeCrypto.CryptArray(party, EncryptionConstant);
 
     // Maximums
-    public sealed override ushort MaxMoveID => Legal.MaxMoveID_4;
+    public sealed override ushort MaxMoveID => this is PK4 { IsFakemonStock: true } ? FakemonStockProfile.LastMove : (ushort)Legal.MaxMoveID_4;
     public sealed override ushort MaxSpeciesID => this is PK4 && HGEngineSpecies.IsCustom(Species) ? HGEngineSpecies.Last : (ushort)Legal.MaxSpeciesID_4;
     public sealed override int MaxAbilityID => Legal.MaxAbilityID_4;
     public sealed override int MaxItemID => Legal.MaxItemID_4_HGSS;

@@ -88,7 +88,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
 
     public sealed override int SIZE_STORED => PokeCrypto.SIZE_4STORED;
     public sealed override int SIZE_PARTY => PokeCrypto.SIZE_4PARTY;
-    public sealed override PK4 BlankPKM => new() { IsHGEngine = this is SAV4HGSS { IsHGEngine: true } };
+    public sealed override PK4 BlankPKM => new() { IsHGEngine = this is SAV4HGSS { IsHGEngine: true }, IsFakemonStock = this is SAV4HGSS { IsFakemonStock: true } };
     public sealed override Type PKMType => typeof(PK4);
 
     public sealed override int BoxCount => 18;
@@ -102,7 +102,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
     public sealed override int MaxMoney => 999999;
     public sealed override int MaxCoins => 50_000;
 
-    public sealed override ushort MaxMoveID => Legal.MaxMoveID_4;
+    public sealed override ushort MaxMoveID => this is SAV4HGSS { IsFakemonStock: true } ? FakemonStockProfile.LastMove : (ushort)Legal.MaxMoveID_4;
     public override ushort MaxSpeciesID => Legal.MaxSpeciesID_4;
     // MaxItemID
     public sealed override int MaxAbilityID => Legal.MaxAbilityID_4;
@@ -399,7 +399,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
     }
     #endregion
 
-    protected sealed override PK4 GetPKM(Memory<byte> data) => new(data) { IsHGEngine = this is SAV4HGSS { IsHGEngine: true } };
+    protected sealed override PK4 GetPKM(Memory<byte> data) => new(data) { IsHGEngine = this is SAV4HGSS { IsHGEngine: true }, IsFakemonStock = this is SAV4HGSS { IsFakemonStock: true } };
     protected sealed override void DecryptPKM(Span<byte> data) => PokeCrypto.Decrypt45(data);
 
     protected override void SetPKM(PKM pk, bool isParty = false)

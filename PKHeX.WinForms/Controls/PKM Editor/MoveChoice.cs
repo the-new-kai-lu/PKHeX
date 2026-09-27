@@ -8,6 +8,7 @@ namespace PKHeX.WinForms.Controls;
 public partial class MoveChoice : UserControl
 {
     private EntityContext Context;
+    private PKM? Entity;
 
     public MoveChoice()
     {
@@ -19,7 +20,8 @@ public partial class MoveChoice : UserControl
     public int PP { get => SelectedMove == 0 ? 0 : Util.ToInt32(TB_PP.Text); set => TB_PP.Text = value.ToString(); }
     public int PPUps { get => SelectedMove == 0 ? 0 : CB_PPUps.SelectedIndex; set => LoadClamp(CB_PPUps, value); }
     public bool HideLegality { private get; set; }
-    public void SetContext(EntityContext context) => Context = context;
+    public void SetContext(EntityContext context) { Context = context; Entity = null; }
+    public void SetContext(PKM entity) { Context = entity.Context; Entity = entity; }
 
     private void UpdateTypeSprite(int value)
     {
@@ -29,7 +31,7 @@ public partial class MoveChoice : UserControl
             return;
         }
 
-        var type = MoveInfo.GetType((ushort)value, Context);
+        var type = Entity is null ? MoveInfo.GetType((ushort)value, Context) : MoveInfo.GetType((ushort)value, Entity);
         PB_Type.Image = TypeSpriteUtil.GetTypeSpriteIconSmall(type);
     }
 

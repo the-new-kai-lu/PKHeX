@@ -11,6 +11,7 @@ public partial class SAV_Pokedex4 : Form
 {
     private readonly SaveFile Origin;
     private readonly SAV4 SAV;
+    private readonly ushort[] DexSpecies;
 
     public SAV_Pokedex4(SAV4 sav)
     {
@@ -29,7 +30,9 @@ public partial class SAV_Pokedex4 : Form
         var filtered = GameInfo.FilteredSources;
         CB_Species.DataSource = new BindingSource(filtered.Species.Skip(1).ToList(), string.Empty);
 
-        for (int i = 1; i < SAV.MaxSpeciesID + 1; i++)
+        DexSpecies = Enumerable.Range(1, SAV.MaxSpeciesID).Select(i => (ushort)i)
+            .Where(i => SAV.Personal.IsSpeciesInGame(i)).ToArray();
+        foreach (var i in DexSpecies)
             LB_Species.Items.Add($"{i:000} - {GameInfo.Strings.specieslist[i]}");
 
         editing = false;
@@ -56,7 +59,7 @@ public partial class SAV_Pokedex4 : Form
 
         editing = true;
         species = (ushort)WinFormsUtil.GetIndex(CB_Species);
-        LB_Species.SelectedIndex = species - 1; // Since we don't allow index0 in combobox, everything is shifted by 1
+        LB_Species.SelectedIndex = Array.IndexOf(DexSpecies, species);
         LB_Species.TopIndex = LB_Species.SelectedIndex;
         GetEntry();
         editing = false;
@@ -69,7 +72,7 @@ public partial class SAV_Pokedex4 : Form
         SetEntry();
 
         editing = true;
-        species = (ushort)(LB_Species.SelectedIndex + 1);
+        species = DexSpecies[LB_Species.SelectedIndex];
         CB_Species.SelectedValue = (int)species;
         GetEntry();
         editing = false;
@@ -95,7 +98,8 @@ public partial class SAV_Pokedex4 : Form
     private void LoadLanguage()
     {
         var dex = SAV.Dex;
-        if (dex.HasLanguage(species))
+        GB_Language.Enabled = dex.HasLanguage(species);
+        if (GB_Language.Enabled)
         {
             for (int i = 0; i < LangCount; i++)
                 CL[i].Checked = dex.GetLanguageBitIndex(species, i);
@@ -174,7 +178,8 @@ public partial class SAV_Pokedex4 : Form
                 dex.SetSeenGenderSecond(species, firstGender ^ 1);
         }
 
-        if (dex.HasLanguage(species))
+        GB_Language.Enabled = dex.HasLanguage(species);
+        if (GB_Language.Enabled)
         {
             for (int i = 0; i < LangCount; i++)
                 dex.SetLanguageBitIndex(species, i, CL[i].Checked);

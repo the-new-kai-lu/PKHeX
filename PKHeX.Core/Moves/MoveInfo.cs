@@ -226,6 +226,12 @@ public static class MoveInfo
         _ => -1,
     };
 
+    public static byte GetType(ushort move, PKM pk) => pk is PK4 { IsFakemonStock: true } && FakemonStockProfile.IsMove(move)
+        ? FakemonStockProfile.MoveTypes[move - FakemonStockProfile.FirstMove] : GetType(move, pk.Context);
+
+    public static byte GetType(ushort move, SaveFile sav) => sav is SAV4HGSS { IsFakemonStock: true } && FakemonStockProfile.IsMove(move)
+        ? FakemonStockProfile.MoveTypes[move - FakemonStockProfile.FirstMove] : GetType(move, sav.Context);
+
     public static byte GetType(ushort move, EntityContext context) => GetType(move, GetTypeTable(context));
 
     public static ReadOnlySpan<byte> GetTypeTable(EntityContext context) => context switch
