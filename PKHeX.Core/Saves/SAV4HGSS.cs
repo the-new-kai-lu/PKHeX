@@ -19,7 +19,8 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
 
     public SAV4HGSS() : base(GeneralSize, StorageSize)
     {
-        Initialize();
+        GetSAVOffsets();
+        Version = GameVersion.HGSS;
         Mystery = new MysteryBlock4HGSS(this, GeneralBuffer.Slice(OffsetMystery, MysteryBlock4HGSS.Size));
         Dex = new Zukan4(this, GeneralBuffer[PokeDex..]);
     }
@@ -29,7 +30,7 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
     private SAV4HGSS(Memory<byte> data, HGEngineSave? adapter) : base(adapter is null ? data : adapter.Normalize(), GeneralSize, StorageSize, GeneralSize + GeneralGap)
     {
         engine = adapter;
-        Initialize();
+        GetSAVOffsets();
         Mystery = new MysteryBlock4HGSS(this, GeneralBuffer.Slice(OffsetMystery, MysteryBlock4HGSS.Size));
         Dex = new Zukan4(this, GeneralBuffer[PokeDex..]);
     }
@@ -57,12 +58,6 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
         new(4, 0x2B000, 0x1D60), // Battle Video (Other Videos 2)
         new(5, 0x2D000, 0x1D60), // Battle Video (Other Videos 3)
     ];
-
-    private void Initialize()
-    {
-        Version = GameVersion.HGSS;
-        GetSAVOffsets();
-    }
 
     protected override Memory<byte> GetFinalData()
     {

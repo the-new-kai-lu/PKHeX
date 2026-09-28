@@ -37,8 +37,8 @@ public class HGSSBaselineTests
             WriteUInt16LittleEndian(general[0x66..], 0xFFFF);
             WriteUInt32LittleEndian(general[0x74..], (uint)(12345 + slot));
             general[0x7D] = 2; // English
-            general[0x1C] = (byte)GameVersion.HGSS; // Initialize writes here before Trainer1 is set.
-            general[0x80] = (byte)GameVersion.HGSS; // SAV4HGSS uses the version group, not HG/SS here.
+            general[0x1C] = (byte)(0x1C + slot); // Unrelated saved data must survive parsing.
+            general[0x80] = (byte)origin;
 
             // Non-block bytes must not be normalized away by an editor export.
             for (int i = SAV4HGSS.GeneralSize; i < StorageStart; i++)
@@ -68,6 +68,30 @@ public class HGSSBaselineTests
         AssertBlockChecksums(data);
         Assert.True(Assert.IsType<SAV4HGSS>(SaveUtil.GetSaveFile(data)).ChecksumsValid);
         return data;
+    }
+
+    [Theory]
+    [InlineData(GameVersion.HG, 0)]
+    [InlineData(GameVersion.SS, 1)]
+    public void LoadingPreservesEveryByteAndNativeVersion(GameVersion origin, int active)
+    {
+        var data = Fixture(origin, active, 1 - active);
+        var before = data.AsSpan().ToArray();
+        var sav = Assert.IsType<SAV4HGSS>(SaveUtil.GetSaveFile(data));
+        Assert.Equal(before, data);
+        Assert.True(sav.ChecksumsValid, sav.ChecksumInfo);
+        Assert.Equal(origin, sav.Version);
+        Assert.Equal((byte)origin, sav.ROMCode);
+        Assert.Equal(before, sav.Data.ToArray());
+    }
+
+    [Fact]
+    public void BlankInitializationSetsVersionAtTrainerOffsetOnly()
+    {
+        var sav = new SAV4HGSS();
+        Assert.Equal(GameVersion.HGSS, sav.Version);
+        Assert.Equal((byte)GameVersion.HGSS, sav.ROMCode);
+        Assert.Equal(0, sav.General[0x1C]);
     }
 
     private static PK4 Pokemon(ushort species, GameVersion origin, byte level)
@@ -154,7 +178,7 @@ public class HGSSBaselineTests
         var sav = Assert.IsType<SAV4HGSS>(SaveUtil.GetSaveFile(before));
         Assert.False(sav.IsHGEngine);
         Assert.Equal(493, sav.MaxSpeciesID);
-        Assert.Equal(GameVersion.HGSS, sav.Version);
+        Assert.Equal(origin, sav.Version);
         Assert.True(sav.State.Exportable);
         Assert.True(sav.ChecksumsValid);
         Assert.Equal((ushort)(12345 + generalActive), sav.TID16);
