@@ -841,7 +841,9 @@ public partial class Main : Form
 
     private static string GetProgramTitle(SaveFile sav)
     {
-        var type = sav.GetType().Name;
+        var type = sav is SAV4HGSS { IsExpandedCampaign: true }
+            ? "Expanded HGSS campaign"
+            : sav.GetType().Name;
         if (sav is ISaveFileRevision rev)
             type += rev.SaveRevisionString;
 

@@ -10,32 +10,65 @@ namespace PKHeX.Core;
 public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
 {
     private readonly HGEngineSave? engine;
+    private readonly ExpandedHGSSCampaignSave? campaign;
+    private Zukan4 dex;
+    private MysteryBlock4HGSS mystery;
     public bool IsHGEngine => engine is not null;
-    internal void CopyHGEngineFrom(SAV4HGSS other)
+    public bool IsExpandedCampaign => campaign is not null;
+    public ReadOnlySpan<byte> CampaignData => campaign is null ? ReadOnlySpan<byte>.Empty : campaign.CampaignData;
+    public ReadOnlySpan<byte> CampaignHoennVariables => campaign is null ? ReadOnlySpan<byte>.Empty : campaign.HoennVariables;
+    public ReadOnlySpan<byte> CampaignHoennFlags => campaign is null ? ReadOnlySpan<byte>.Empty : campaign.HoennFlags;
+    public ReadOnlySpan<byte> CampaignSinnohVariables => campaign is null ? ReadOnlySpan<byte>.Empty : campaign.SinnohVariables;
+    public ReadOnlySpan<byte> CampaignSinnohFlags => campaign is null ? ReadOnlySpan<byte>.Empty : campaign.SinnohFlags;
+    internal void ValidateCopyFormat(SaveFile other)
+    {
+        if (other is not SAV4HGSS source || IsExpandedCampaign != source.IsExpandedCampaign || IsHGEngine != source.IsHGEngine)
+            throw new ArgumentException("Cannot copy changes across HGSS save formats.", nameof(other));
+    }
+    internal void CopyHGSSAdaptersFrom(SAV4HGSS other)
     {
         if (engine is not null && other.engine is not null) engine.CopyFrom(other.engine);
+        if (campaign is not null && other.campaign is not null)
+        {
+            campaign.CopyFrom(other.campaign);
+            // A same-format source may use different banks. Rebind all views, not the backup data.
+            SetBlockPositions(GeneralSize, StorageSize, GeneralSize + GeneralGap, campaign.GeneralBank, campaign.StorageBank);
+            mystery = new MysteryBlock4HGSS(this, GeneralBuffer.Slice(OffsetMystery, MysteryBlock4HGSS.Size));
+            dex = new Zukan4(this, GeneralBuffer[PokeDex..]);
+        }
     }
+    internal void SetCampaignChecksums() => campaign!.SetChecksums(Data, ExtraBlocks);
     internal Memory<byte> HGEngineDex => engine?.Dex ?? Memory<byte>.Empty;
 
     public SAV4HGSS() : base(GeneralSize, StorageSize)
     {
-        Initialize();
-        Mystery = new MysteryBlock4HGSS(this, GeneralBuffer.Slice(OffsetMystery, MysteryBlock4HGSS.Size));
-        Dex = new Zukan4(this, GeneralBuffer[PokeDex..]);
+        GetSAVOffsets();
+        Version = GameVersion.HGSS;
+        mystery = new MysteryBlock4HGSS(this, GeneralBuffer.Slice(OffsetMystery, MysteryBlock4HGSS.Size));
+        dex = new Zukan4(this, GeneralBuffer[PokeDex..]);
     }
 
-    public SAV4HGSS(Memory<byte> data) : this(data, HGEngineSave.IsRecognized(data.Span) ? new HGEngineSave(data.Span) : null) { }
+    public SAV4HGSS(Memory<byte> data) : this(data,
+        ExpandedHGSSCampaignSave.IsRecognized(data.Span) ? new ExpandedHGSSCampaignSave(data.Span) : null) { }
 
-    private SAV4HGSS(Memory<byte> data, HGEngineSave? adapter) : base(adapter is null ? data : adapter.Normalize(), GeneralSize, StorageSize, GeneralSize + GeneralGap)
+    private SAV4HGSS(Memory<byte> data, ExpandedHGSSCampaignSave? adapter) : this(data, adapter,
+        adapter is null && HGEngineSave.IsRecognized(data.Span) ? new HGEngineSave(data.Span) : null) { }
+
+    private SAV4HGSS(Memory<byte> data, ExpandedHGSSCampaignSave? expanded, HGEngineSave? adapter) : base(
+        expanded is not null ? expanded.Normalize() : adapter is not null ? adapter.Normalize() : data,
+        GeneralSize, StorageSize, GeneralSize + GeneralGap, expanded?.GeneralBank, expanded?.StorageBank)
     {
         engine = adapter;
-        Initialize();
-        Mystery = new MysteryBlock4HGSS(this, GeneralBuffer.Slice(OffsetMystery, MysteryBlock4HGSS.Size));
-        Dex = new Zukan4(this, GeneralBuffer[PokeDex..]);
+        campaign = expanded;
+        GetSAVOffsets();
+        mystery = new MysteryBlock4HGSS(this, GeneralBuffer.Slice(OffsetMystery, MysteryBlock4HGSS.Size));
+        dex = new Zukan4(this, GeneralBuffer[PokeDex..]);
     }
 
-    public override Zukan4 Dex { get; }
-    protected override SAV4 CloneInternal4() => State.Exportable ? new SAV4HGSS(engine is null ? Data.ToArray() : engine.Export(Data)) : new SAV4HGSS();
+    public override Zukan4 Dex => dex;
+    protected override SAV4 CloneInternal4() => State.Exportable
+        ? new SAV4HGSS(campaign is not null ? campaign.Export(Data) : engine is not null ? engine.Export(Data) : Data.ToArray())
+        : new SAV4HGSS();
 
     public override GameVersion Version { get => (GameVersion)ROMCode; set => ROMCode = (byte)value; }
     public override PersonalTable4 Personal => IsHGEngine ? HGEngineSpecies.Personal : PersonalTable.HGSS;
@@ -58,26 +91,20 @@ public sealed class SAV4HGSS : SAV4, IBoxDetailName, IBoxDetailWallpaper
         new(5, 0x2D000, 0x1D60), // Battle Video (Other Videos 3)
     ];
 
-    private void Initialize()
-    {
-        Version = GameVersion.HGSS;
-        GetSAVOffsets();
-    }
-
     protected override Memory<byte> GetFinalData()
     {
         // Make sure all boxes are copied when saved only once in-game.
         // This results in the game "saving a lot of data", but ensures the boxdata struct does not corrupt in-game on single save.
         FlagsBoxContentChanged = FlagsBoxContentChangedAll;
         var result = base.GetFinalData();
-        return engine is null ? result : engine.Export(result.Span);
+        return campaign is not null ? campaign.Export(result.Span) : engine is not null ? engine.Export(result.Span) : result;
     }
 
     private const int OffsetMystery = 0x9D3C; // Flags and Gifts
     protected override int EventWork => 0xDE4;
     protected override int EventFlag => 0x10C4;
     protected override int DaycareOffset => 0x15FC;
-    public override MysteryBlock4HGSS Mystery { get; }
+    public override MysteryBlock4HGSS Mystery => mystery;
     public override BattleFrontierFacility4 MaxFacility => BattleFrontierFacility4.Arcade;
 
     private void GetSAVOffsets()

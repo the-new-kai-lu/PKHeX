@@ -20,15 +20,15 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
     private const int PartitionSize = 0x40000;
 
     // SaveData is chunked into two pieces.
-    private readonly Memory<byte> StorageBuffer;
-    protected internal readonly Memory<byte> GeneralBuffer;
+    private Memory<byte> StorageBuffer;
+    protected internal Memory<byte> GeneralBuffer;
     protected Span<byte> Storage => StorageBuffer.Span;
     public Span<byte> General => GeneralBuffer.Span;
     protected sealed override Span<byte> BoxBuffer => Storage;
     protected sealed override Span<byte> PartyBuffer => General;
 
-    private readonly Memory<byte> BackupStorageBuffer;
-    private readonly Memory<byte> BackupGeneralBuffer;
+    private Memory<byte> BackupStorageBuffer;
+    private Memory<byte> BackupGeneralBuffer;
     private Span<byte> BackupStorage => BackupStorageBuffer.Span;
     private Span<byte> BackupGeneral => BackupGeneralBuffer.Span;
     protected abstract IReadOnlyList<BlockInfo4> ExtraBlocks { get; }
@@ -50,18 +50,21 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
         ClearBoxes();
     }
 
-    protected SAV4(Memory<byte> data, [ConstantExpected] int gSize, [ConstantExpected] int sSize, [ConstantExpected] int sStart) : base(data)
+    protected SAV4(Memory<byte> data, [ConstantExpected] int gSize, [ConstantExpected] int sSize, [ConstantExpected] int sStart,
+        int? generalBank = null, int? storageBank = null) : base(data)
     {
-        var GeneralBlockPosition = GetActiveBlock(Data, 0, gSize);
-        var StorageBlockPosition = GetActiveBlock(Data, sStart, sSize);
+        SetBlockPositions(gSize, sSize, sStart, generalBank ?? GetActiveBlock(Data, 0, gSize), storageBank ?? GetActiveBlock(Data, sStart, sSize));
+    }
 
-        var gbo = (GeneralBlockPosition == 0 ? 0 : PartitionSize);
-        var sbo = (StorageBlockPosition == 0 ? 0 : PartitionSize) + sStart;
+    protected void SetBlockPositions(int gSize, int sSize, int sStart, int generalBank, int storageBank)
+    {
+        var gbo = (generalBank == 0 ? 0 : PartitionSize);
+        var sbo = (storageBank == 0 ? 0 : PartitionSize) + sStart;
         GeneralBuffer = Buffer.Slice(gbo, gSize);
         StorageBuffer = Buffer.Slice(sbo, sSize);
 
-        var gboBackup = (GeneralBlockPosition != 0 ? 0 : PartitionSize);
-        var sboBackup = (StorageBlockPosition != 0 ? 0 : PartitionSize) + sStart;
+        var gboBackup = (generalBank != 0 ? 0 : PartitionSize);
+        var sboBackup = (storageBank != 0 ? 0 : PartitionSize) + sStart;
         BackupGeneralBuffer = Buffer.Slice(gboBackup, gSize);
         BackupStorageBuffer = Buffer.Slice(sboBackup, sSize);
     }
@@ -79,9 +82,13 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
 
     public sealed override void CopyChangesFrom(SaveFile sav)
     {
+        if (this is SAV4HGSS target)
+            target.ValidateCopyFormat(sav);
+        else if (sav is SAV4HGSS { IsExpandedCampaign: true })
+            throw new ArgumentException("Cannot copy an ExpandedHGSS campaign save into another format.", nameof(sav));
         SetData(sav.Data, 0);
         var s4 = (SAV4)sav;
-        if (this is SAV4HGSS hg && sav is SAV4HGSS source) hg.CopyHGEngineFrom(source);
+        if (this is SAV4HGSS hg && sav is SAV4HGSS source) hg.CopyHGSSAdaptersFrom(source);
         SetData(General, s4.General);
         SetData(Storage, s4.Storage);
     }
@@ -133,6 +140,11 @@ public abstract class SAV4 : SaveFile, IEventFlag37, IDaycareStorage, IDaycareRa
 
     protected sealed override void SetChecksums()
     {
+        if (this is SAV4HGSS { IsExpandedCampaign: true } expanded)
+        {
+            expanded.SetCampaignChecksums();
+            return;
+        }
         WriteUInt16LittleEndian(General[^2..], CalcBlockChecksum(General));
         WriteUInt16LittleEndian(Storage[^2..], CalcBlockChecksum(Storage));
         if (ReadUInt32LittleEndian(BackupGeneral[^8..^4]) != 0xFFFFFFFF)
