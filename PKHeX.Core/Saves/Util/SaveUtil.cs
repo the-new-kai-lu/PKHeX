@@ -164,6 +164,8 @@ public static class SaveUtil
     /// <returns>Save file type information including sub-version details, or Invalid if type cannot be determined.</returns>
     private static SaveTypeInfo GetTypeInfo(ReadOnlySpan<byte> data)
     {
+        // Detect the campaign family (and reject unsupported headers) before any retail fallback.
+        if (ExpandedHGSSCampaignSave.IsRecognized(data)) return HGSS;
         // Mainline
         if (IsG1(data, out var info)) return info;
         if (IsG2(data, out info)) return info;
@@ -496,6 +498,15 @@ public static class SaveUtil
         if (TryGetSaveFileCustom(data, out result, path))
             return true;
 
+        // A genuine DSV exposes the raw campaign tag before its footer. Verify and split
+        // that container before strict raw-length validation; arbitrary trailing bytes
+        // still reach the raw reader and reject rather than being silently discarded.
+        foreach (var handler in Handlers)
+        {
+            if (handler is SaveHandlerDeSmuME && TryGetSaveFileHandler(data, out result, path, handler))
+                return true;
+        }
+
         result = GetSaveFileInternal(data);
         if (result is not null)
             return true;
@@ -518,6 +529,13 @@ public static class SaveUtil
     {
         try
         {
+            // Its Buffer is an editing projection, not a physical stock file. Never reinterpret
+            // that view and discard the retained campaign allocation during a type override.
+            if (sav is SAV4HGSS { IsExpandedCampaign: true })
+            {
+                result = toType.Type == HGSS ? sav.Clone() : null;
+                return result is not null;
+            }
             var data = sav.Buffer;
             result = GetSaveFileInternal(data, toType);
             if (result is null)
